@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Impec: Smile Challenge (Integrated)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial; background:#f3f4f6}
+    .gradient-bg{background-image:linear-gradient(to bottom right,#f8bbd0,#e91e63)}
+    .mask-overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+    #image-canvas{max-width:100%;border-radius:12px}
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6">
+  <div class="bg-white rounded-3xl shadow-xl w-full max-w-3xl p-6 space-y-6">
+    <div class="flex items-center gap-4">
+      <img src="assets/mid-logo.png" alt="logo" class="w-16 h-16 rounded-full hidden" />
+      <div>
+        <h1 class="text-2xl font-bold">Impec: Smile Challenge (Client-side)</h1>
+        <p class="text-sm text-gray-600">Runs entirely in the browser (no servers). Uses MediaPipe FaceMesh for mouth landmark detection and a deterministic tooth-mask+contour heuristic for analysis.</p>
+      </div>
+    </div>
+
+    <div id="form-section" class="space-y-3">
+      <button id="form-complete-btn" class="px-4 py-2 rounded-full bg-gray-200">I've completed the form (mock)</button>
+    </div>
+
+    <div id="upload-section" class="space-y-3 hidden">
+      <div id="image-preview" class="w-full h-64 bg-gray-100 rounded-xl flex items-center justify-center p-4 relative">
+        <canvas id="image-canvas"></canvas>
+        <canvas id="mask-canvas" class="mask-overlay"></canvas>
+      </div>
+
+      <div class="flex gap-2">
+        <input id="image-upload" type="file" accept="image/*" class="hidden" />
+        <button onclick="document.getElementById('image-upload').click()" class="flex-1 py-3 rounded-full bg-pink-100 text-pink-700">Upload Photo</button>
+        <button id="camera-btn" class="flex-1 py-3 rounded-full bg-pink-600 text-white">Take Photo</button>
+      </div>
+
+      <button id="analyze-btn" disabled class="w-full py-3 rounded-full bg-gray-200">Analyze My Smile</button>
+    </div>
+
+    <div id="results-section" class="space-y-3 hidden">
+      <div class="text-center">
+        <div class="text-gray-600">Analysis Complete</div>
+        <div id="smile-score-display" class="text-5xl font-extrabold text-pink-600">--</div>
+        <div id="score-band" class="mt-2 text-sm text-gray-700"></div>
+      </div>
+
+      <div class="p-4 bg-yellow-50 rounded-xl flex justify-between items-center">
+        <div>
+          <div class="text-sm text-yellow-900 font-semibold">Your Discount</div>
+        </div>
+        <div id="discount-percent" class="text-3xl font-extrabold text-pink-600">0%</div>
+      </div>
+
+      <a id="whatsapp-link" href="#" target="_blank" class="block w-full text-center py-3 rounded-full gradient-bg text-white font-bold">Need Review with Expert</a>
+    </div>
+
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-xl p-6 w-full max-w-sm text-center">
+        <h3 id="modal-title" class="text-xl font-bold"></h3>
+        <p id="modal-message" class="text-gray-600"></p>
+        <button id="modal-close-btn" class="mt-4 w-full py-2 bg-pink-600 text-white rounded-full">OK</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MediaPipe FaceMesh -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script>
+    // -- Utilities
+    const el = (id)=>document.getElementById(id);
+
+    // When user 'completes form' we show upload section (keeps original flow)
+    el('form-complete-btn').addEventListener('click', ()=>{ el('form-section').classList.add('hidden'); el('upload-section').classList.remove('hidden'); });
+
+    const imageUpload = el('image-upload');
+    const analyzeBtn = el('analyze-btn');
+    const cameraBtn = el('camera-btn');
+    const imageCanvas = el('image-canvas');
+    const maskCanvas = el('mask-canvas');
+    const resultsSection = el('results-section');
+    const resultsScore = el('smile-score-display');
+    const scoreBand = el('score-band');
+    const discountEl = el('discount-percent');
+
+    let loadedImage = null; // Image object or video frame
+    let useVideo = false;
+    let videoStream = null;
+
+    // load file
+    imageUpload.addEventListener('change', async (e)=>{
+      const file = e.target.files[0];
+      if(!file) return; loadedImage = await fileToImage(file); drawToCanvas(loadedImage); analyzeBtn.disabled=false; stopCameraIfAny();
+    });
+
+    function fileToImage(file){
+      return new Promise((res, rej)=>{ const r = new FileReader(); r.onload = ()=>{ const img=new Image(); img.onload=()=>res(img); img.src=r.result; }; r.onerror=rej; r.readAsDataURL(file); });
+    }
+
+    function drawToCanvas(img){
+      const cw = Math.min(1000, img.width);
+      const scale = cw / img.width;
+      imageCanvas.width = cw; imageCanvas.height = Math.round(img.height * scale);
+      maskCanvas.width = imageCanvas.width; maskCanvas.height=imageCanvas.height;
+      const ctx = imageCanvas.getContext('2d'); ctx.clearRect(0,0,imageCanvas.width,imageCanvas.height); ctx.drawImage(img,0,0,imageCanvas.width,imageCanvas.height);
+      clearMask();
+    }
+
+    function clearMask(){ const mctx=maskCanvas.getContext('2d'); mctx.clearRect(0,0,maskCanvas.width,maskCanvas.height); }
+
+    cameraBtn.addEventListener('click', async ()=>{
+      // start camera, show preview on canvas and enable analyze
+      try{
+        stopCameraIfAny();
+        videoStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
+        const video = document.createElement('video'); video.autoplay=true; video.playsInline=true; video.srcObject = videoStream;
+        await video.play(); useVideo=true; loadedImage = video;
+        // draw live frame to canvas
+        const loop = ()=>{ if(!useVideo) return; const ctx=imageCanvas.getContext('2d'); const w=imageCanvas.width||480; if(!imageCanvas.width){ imageCanvas.width=video.videoWidth; imageCanvas.height=video.videoHeight; } ctx.drawImage(video,0,0,imageCanvas.width,imageCanvas.height); requestAnimationFrame(loop); }; loop(); analyzeBtn.disabled=false;
+      }catch(err){ showModal('Camera error','Could not access camera. Please allow permissions or upload a photo.'); }
+    });
+
+    function stopCameraIfAny(){ if(videoStream){ const tracks = videoStream.getTracks(); tracks.forEach(t=>t.stop()); videoStream=null; useVideo=false; } }
+
+    el('modal-close-btn').addEventListener('click', ()=>el('modal').classList.add('hidden'));
+    function showModal(title, msg){ el('modal-title').innerText=title; el('modal-message').innerText=msg; el('modal').classList.remove('hidden'); }
+
+    // -- Simple image helpers
+    function getImageDataFromCanvas(){ const ctx = imageCanvas.getContext('2d'); return ctx.getImageData(0,0,imageCanvas.width,imageCanvas.height); }
+
+    function putMaskOnCanvas(mask){ const mctx = maskCanvas.getContext('2d'); const w=maskCanvas.width, h=maskCanvas.height; const img = mctx.createImageData(w,h); for(let i=0;i<w*h;i++){ const v = mask[i]?180:0; img.data[i*4+0]=255; img.data[i*4+1]=100; img.data[i*4+2]=180; img.data[i*4+3]=mask[i]?120:0; } mctx.putImageData(img,0,0); }
+
+    // -- Connected component labeling (4-neighbour) returns array mask labels and count
+    function labelComponents(mask,w,h){ const labels = new Int32Array(w*h); let label=0; const stack = []; for(let y=0;y<h;y++){ for(let x=0;x<w;x++){ const idx=y*w+x; if(mask[idx] && labels[idx]===0){ label++; labels[idx]=label; stack.push(idx); while(stack.length){ const p=stack.pop(); const px=p%w, py=Math.floor(p/w); const neighbors = [p-1,p+1,p-w,p+w]; for(const n of neighbors){ if(n>=0 && n<w*h && mask[n] && labels[n]===0){ labels[n]=label; stack.push(n); } } } } } } return {labels, count:label}; }
+
+    // helper to compute bounding box of a label
+    function bboxOfLabel(labels, w, h, target){ let minx=w, miny=h, maxx=0, maxy=0; let found=false; for(let i=0;i<w*h;i++){ if(labels[i]===target){ found=true; const x=i%w, y=Math.floor(i/w); if(x<minx)minx=x; if(y<miny)miny=y; if(x>maxx)maxx=x; if(y>maxy)maxy=y; } } if(!found) return null; return {minx,miny,maxx,maxy,width:maxx-minx+1,height:maxy-miny+1}; }
+
+    // -- Smile analysis pipeline using MediaPipe face mesh for mouth region then simple tooth mask + deterministic scoring
+    // Mouth landmarks indices (MediaPipe) approximate inner/outer lip range
+    const MOUTH_LANDMARKS = [61,146,91,181,84,17,314,405,321,375,291,308]; // outer ring sample
+
+    // Set up FaceMesh
+    const faceMesh = new FaceMesh.FaceMesh({locateFile: (file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+    faceMesh.setOptions({maxNumFaces:1,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+    faceMesh.onResults(onFaceResults);
+
+    // We will run a single send(image) when analyzing
+    async function runFaceMeshOnCanvas(){ const data = imageCanvas; return new Promise((res)=>{ faceMesh.onResults((r)=>res(r)); faceMesh.send({image: data}); }); }
+
+    analyzeBtn.addEventListener('click', async ()=>{
+      analyzeBtn.disabled=true; resultsSection.classList.add('hidden');
+      if(!imageCanvas.width || !imageCanvas.height){ showModal('No image','Please upload or capture a photo first.'); analyzeBtn.disabled=false; return; }
+
+      // Run face mesh
+      let faceRes;
+      try{ faceRes = await runFaceMeshOnCanvas(); }catch(e){ showModal('Analysis error','Face landmark detection failed. Try a clearer frontal photo.'); analyzeBtn.disabled=false; return; }
+
+      if(!faceRes.multiFaceLandmarks || faceRes.multiFaceLandmarks.length===0){ showModal('No face detected','Please upload a clear frontal face photo with teeth visible.'); analyzeBtn.disabled=false; return; }
+
+      const lm = faceRes.multiFaceLandmarks[0];
+      // compute mouth bounding box in canvas coords
+      let minx=imageCanvas.width, miny=imageCanvas.height, maxx=0, maxy=0;
+      for(const idx of MOUTH_LANDMARKS){ const p = lm[idx]; const x=Math.round(p.x*imageCanvas.width), y=Math.round(p.y*imageCanvas.height); if(x<minx)minx=x; if(y<miny)miny=y; if(x>maxx)maxx=x; if(y>maxy)maxy=y; }
+      // expand a little
+      const padX = Math.round((maxx-minx)*0.5); const padY = Math.round((maxy-miny)*0.6);
+      minx = Math.max(0, minx-padX); maxx = Math.min(imageCanvas.width-1, maxx+padX); miny = Math.max(0, miny-padY); maxy = Math.min(imageCanvas.height-1, maxy+padY);
+      const w = maxx-minx+1, h = maxy-miny+1;
+      if(w<20 || h<10){ showModal('Mouth not visible','Please provide a picture with mouth/teeth clearly visible.'); analyzeBtn.disabled=false; return; }
+
+      const ctx = imageCanvas.getContext('2d'); const imgData = ctx.getImageData(minx,miny,w,h);
+      // convert to HSL-like luminance and saturation, compute meanLight
+      const N = w*h; let sumL=0; for(let i=0;i<N;i++){ const r=imgData.data[i*4], g=imgData.data[i*4+1], b=imgData.data[i*4+2]; sumL += (Math.max(r,g,b)+Math.min(r,g,b))/510; }
+      const meanLight = sumL/N;
+      // build tooth mask heuristic: bright + low saturation
+      const mask = new Uint8Array(N);
+      for(let i=0;i<N;i++){ const r=imgData.data[i*4], g=imgData.data[i*4+1], b=imgData.data[i*4+2]; const maxc=Math.max(r,g,b)/255, minc=Math.min(r,g,b)/255; const l = (maxc+minc)/2; const s = (maxc===minc)?0:((l>0.5)?(maxc-minc)/(2-maxc-minc): (maxc-minc)/(maxc+minc)); if(l > Math.max(0.65, meanLight*1.05) && s < 0.35){ mask[i]=1; } }
+
+      // simple morphological cleanup (remove isolated pixels)
+      const cleaned = new Uint8Array(N);
+      for(let y0=1;y0<h-1;y0++){ for(let x0=1;x0<w-1;x0++){ const i = y0*w+x0; const c = mask[i]?1:0; let neigh=0; if(c){ neigh += mask[i-1]; neigh+=mask[i+1]; neigh+=mask[i-w]; neigh+=mask[i+w]; if(neigh>=1) cleaned[i]=1; } } }
+
+      // label components
+      const {labels,count} = labelComponents(cleaned, w, h);
+      // gather component areas
+      const areas = new Array(count+1).fill(0);
+      for(let i=0;i<w*h;i++){ const L=labels[i]; if(L>0) areas[L]++; }
+      // sort components by area desc
+      const comps = []; for(let L=1;L<=count;L++){ comps.push({label:L,area:areas[L]}); } comps.sort((a,b)=>b.area-a.area);
+
+      // estimate number of tooth blobs: count of components with area above threshold
+      const toothComps = comps.filter(c=>c.area >= Math.max(10, Math.round(0.008*w*h)));
+      const toothCount = toothComps.length;
+
+      // compute symmetry: mirror left-right and compute overlap between mask and mirrored mask
+      const half = Math.floor(w/2);
+      let overlap=0, total=0;
+      for(let y0=0;y0<h;y0++){ for(let x0=0;x0<half;x0++){ const i = y0*w+x0; const j = y0*w+(w-1-x0); const a = cleaned[i]?1:0; const b = cleaned[j]?1:0; overlap += (a&&b)?1:0; total += (a||b)?1:0; } }
+      const symmetryScore = total>0 ? (overlap/total) : 0;
+
+      // alignment: compute centroid y for each component and measure variance across components along dental arch
+      const centroids = []; for(const c of toothComps){ let sx=0, sy=0, cnt=0; for(let i=0;i<w*h;i++){ if(labels[i]===c.label){ const x=i%w, y=Math.floor(i/w); sx+=x; sy+=y; cnt++; } } if(cnt){ centroids.push({x:sx/cnt, y:sy/cnt}); } }
+      // fit a quadratic curve to centroids' x->y (simple least squares for ax^2+bx+c)
+      let alignmentDeviation=0;
+      if(centroids.length>=3){ const m = centroids.length; let Sx=0,Sx2=0,Sx3=0,Sx4=0,Sy=0,Sxy=0,Sx2y=0; for(const p of centroids){ const x=p.x, y=p.y; Sx+=x; Sx2+=x*x; Sx3+=x*x*x; Sx4+=x*x*x*x; Sy+=y; Sxy+=x*y; Sx2y+=x*x*y; }
+        // solve normal equations for quadratic: [Sx4 Sx3 Sx2][a]=[Sx2y]
+        // We'll use a simple matrix solve for 3x3
+        const A = [[Sx4,Sx3,Sx2],[Sx3,Sx2,Sx],[Sx2,Sx,m]];
+        const B = [Sx2y,Sxy,Sy];
+        // Cramer's rule
+        function det3(M){ return M[0][0]*(M[1][1]*M[2][2]-M[1][2]*M[2][1]) - M[0][1]*(M[1][0]*M[2][2]-M[1][2]*M[2][0]) + M[0][2]*(M[1][0]*M[2][1]-M[1][1]*M[2][0]); }
+        const D = det3(A);
+        if(Math.abs(D)>1e-6){ const A1 = [ [B[0],A[0][1],A[0][2]],[B[1],A[1][1],A[1][2]],[B[2],A[2][1],A[2][2]] ]; const A2=[ [A[0][0],B[0],A[0][2]],[A[1][0],B[1],A[1][2]],[A[2][0],B[2],A[2][2]] ]; const A3=[ [A[0][0],A[0][1],B[0]],[A[1][0],A[1][1],B[1]],[A[2][0],A[2][1],B[2]] ]; const a=det3(A1)/D, b=det3(A2)/D, c=det3(A3)/D; // evaluate residuals
+          let ss=0; for(const p of centroids){ const pred = a*p.x*p.x + b*p.x + c; ss += Math.abs(pred - p.y); } alignmentDeviation = ss/centroids.length / Math.max(1,h); }
+      } else if(centroids.length>0){ // simple mean vertical deviation from median y
+        const ys = centroids.map(p=>p.y); const med = ys.sort((a,b)=>a-b)[Math.floor(ys.length/2)]; let ss=0; for(const y of ys) ss+=Math.abs(y-med); alignmentDeviation = ss/ys.length / Math.max(1,h);
+      }
+
+      // gaps/crowding proxy: compute average component width and compare to gaps between bounding boxes
+      let gapScore=0; if(toothComps.length>=2){ const boxes = toothComps.map(c=>bboxOfLabel(labels,w,h,c.label)).filter(Boolean).sort((a,b)=>a.minx-b.minx); const widths = boxes.map(b=>b.width); const avgw = widths.reduce((a,b)=>a+b,0)/widths.length; let gaps=[]; for(let i=0;i<boxes.length-1;i++){ gaps.push(boxes[i+1].minx - boxes[i].maxx - 1); } const avgGap = gaps.length? (gaps.reduce((a,b)=>a+b,0)/gaps.length) : 0; // gap ratio
+        gapScore = Math.max(0, 1 - (avgGap/(avgw+1))); }
+
+      // missing teeth penalty proxy: compare tooth count to expected (estimate 8 visible teeth in smile)
+      const expectedVisible = 8; const missingPenalty = Math.max(0, (expectedVisible - toothCount)/expectedVisible);
+
+      // Now compute deterministic smile score 0-100
+      // weights (tuned heuristically)
+      const w1 = 30; // alignment
+      const w2 = 30; // symmetry (higher is better)
+      const w3 = 20; // crowding/gaps
+      const w4 = 20; // missing
+
+      const normAlignment = Math.min(1, alignmentDeviation*4); // larger deviation worse
+      const normSymmetry = 1 - Math.min(1, symmetryScore); // lower symmetryScore => worse
+      const normCrowding = Math.min(1, gapScore);
+      const normMissing = Math.min(1, missingPenalty);
+
+      let smileScore = 100 - (w1*normAlignment + w2*normSymmetry + w3*normCrowding + w4*normMissing);
+      smileScore = Math.round(Math.max(0, Math.min(100, smileScore)));
+
+      // draw mask overlay on maskCanvas
+      putMaskOnCanvas(cleaned);
+      // draw bounding box on image canvas
+      const gctx = imageCanvas.getContext('2d'); gctx.strokeStyle='rgba(233,30,99,0.8)'; gctx.lineWidth=2; gctx.strokeRect(minx,miny,w,h);
+
+      // show results
+      resultsScore.innerText = smileScore;
+      if(smileScore>=90) scoreBand.innerText='Excellent smile'; else if(smileScore>=70) scoreBand.innerText='Good smile'; else if(smileScore>=50) scoreBand.innerText='Average smile'; else scoreBand.innerText='Needs improvement';
+      discountEl.innerText = (Math.floor(smileScore/10)*5) + '%';
+      resultsSection.classList.remove('hidden'); analyzeBtn.disabled=false;
+
+      // set WhatsApp link with prefilled message and screenshot data
+      try{ const dataURL = imageCanvas.toDataURL('image/png'); const message = encodeURIComponent(`Hi, I ran Impec Smile Check and got ${smileScore} — attaching screenshot.`); el('whatsapp-link').href = `https://wa.me/?text=${message}`; }catch(e){}
+    });
+
+  </script>
+</body>
+</html>
