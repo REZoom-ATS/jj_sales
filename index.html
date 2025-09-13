@@ -55,6 +55,10 @@
             width: 100%;
             height: 100%;
         }
+        .slash-price {
+            text-decoration: line-through;
+            color: #9ca3af;
+        }
     </style>
 </head>
 <body class="text-gray-800">
@@ -130,41 +134,27 @@
         // The images array can hold multiple URLs.
         const products = [
             {
-                name: "Prestige Induction Cooktop",
-                price: "₹3,999",
+                name: "Surya K-Star Infrared Cooker (All Utensils Compatible)",
+                price: "₹1,200",
+                mrp: "₹4,000",
+                discount: 70, // Calculated: ((4000 - 1200) / 4000) * 100
                 images: [
-                    "https://placehold.co/800x600/F0F0F0/2c3e50?text=Prestige+Induction",
-                    "https://placehold.co/800x600/C0C0C0/2c3e50?text=Side+View",
-                    "https://placehold.co/800x600/D0D0D0/2c3e50?text=Controls"
+                    "https://placehold.co/800x600/FFD966/333333?text=Surya+Cooker",
+                    "https://placehold.co/800x600/FFECB3/333333?text=Top+View",
+                    "https://placehold.co/800x600/FFE082/333333?text=Side+View"
                 ],
-                youtube: "jD_FjXgW71k" // Example YouTube video ID
+                youtube: "jD_FjXgW71k" 
             },
             {
-                name: "Bajaj Mixer Grinder",
-                price: "₹2,500",
+                name: "Silver Crest 800 Watt meat and vegetable Chopper",
+                price: "₹1,200",
+                mrp: "₹5,000",
+                discount: 76, // Calculated: ((5000 - 1200) / 5000) * 100
                 images: [
-                    "https://placehold.co/800x600/D9D9D9/2c3e50?text=Bajaj+Mixer",
-                    "https://placehold.co/800x600/B0B0B0/2c3e50?text=Jar+Set",
+                    "https://placehold.co/800x600/B0BEC5/333333?text=Silver+Crest+Chopper",
+                    "https://placehold.co/800x600/CFD8DC/333333?text=Open+View"
                 ],
                 youtube: "j8z8_E5T72k"
-            },
-            {
-                name: "Philips Electric Iron",
-                price: "₹1,200",
-                images: [
-                    "https://placehold.co/800x600/A0A0A0/2c3e50?text=Philips+Iron",
-                    "https://placehold.co/800x600/E0E0E0/2c3e50?text=Soleplate"
-                ],
-                youtube: "G1L0m7vX11A"
-            },
-            {
-                name: "Havells Water Heater",
-                price: "₹7,800",
-                images: [
-                    "https://placehold.co/800x600/B0B0B0/2c3e50?text=Havells+Water+Heater",
-                    "https://placehold.co/800x600/A5A5A5/2c3e50?text=Installation+View"
-                ],
-                youtube: "p8oD_k7y0A4"
             }
         ];
 
@@ -189,11 +179,16 @@
 
                 card.innerHTML = `
                     <img src="${product.images[0]}" alt="${product.name}" class="w-full h-48 object-cover rounded-md mb-4">
-                    <div class="flex-grow">
-                        <h3 class="text-xl font-semibold text-gray-900 mb-1">${product.name}</h3>
-                        <p class="text-2xl font-bold text-blue-600 mb-4">${product.price}</p>
+                    <div class="flex-grow flex flex-col items-center">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-1">${product.name}</h3>
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-sm slash-price">${product.mrp}</span>
+                            <span class="text-xs font-bold text-red-500 bg-red-100 px-2 py-0.5 rounded-full">${product.discount}% OFF</span>
+                        </div>
+                        <p class="text-2xl font-bold text-blue-600 mb-2">${product.price}</p>
+                        <div id="timer-${index}" class="text-sm font-semibold text-gray-500"></div>
                     </div>
-                    <button class="bg-gray-200 text-gray-800 font-medium py-2 px-6 rounded-lg hover:bg-gray-300 transition-colors">
+                    <button class="bg-gray-200 text-gray-800 font-medium py-2 px-6 rounded-lg hover:bg-gray-300 transition-colors mt-4">
                         View Details
                     </button>
                 `;
@@ -201,6 +196,32 @@
                 card.addEventListener('click', () => showProductDetails(product));
                 productList.appendChild(card);
             });
+            startDailyTimer();
+        }
+
+        // Function to update the daily timer
+        function startDailyTimer() {
+            function updateTimers() {
+                const now = new Date();
+                const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+                const timeLeft = endOfDay - now;
+
+                const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+                const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                products.forEach((_, index) => {
+                    const timerElement = document.getElementById(`timer-${index}`);
+                    if (timerElement) {
+                        timerElement.textContent = `Ends in: ${timeString}`;
+                    }
+                });
+            }
+
+            setInterval(updateTimers, 1000);
+            updateTimers(); // Initial call to display immediately
         }
 
         // Function to show the product detail modal
