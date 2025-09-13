@@ -1,983 +1,267 @@
-import React, { useState, useEffect, useRef } from 'react';
-import ReactDOM from 'react-dom/client';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J. J. Home Appliances</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc;
+        }
+        .product-card {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease-in-out;
+        }
+        .product-card:hover {
+            transform: translateY(-5px);
+        }
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            z-index: 50;
+        }
+        .modal {
+            z-index: 60;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .fade-out {
+            animation: fadeOut 0.3s ease-in-out forwards;
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.95); }
+        }
+        .yt-container {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            height: 0;
+            overflow: hidden;
+            border-radius: 0.5rem;
+        }
+        .yt-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
 
-// Use this to prevent issues with ReactDOM.render not being available
-const root = ReactDOM.createRoot(document.getElementById('root'));
-
-// Helper to check for reduced motion preference
-const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-// Initial placeholder product data
-const defaultProducts = [
-    {
-        id: 'product-1',
-        name: '4K Ultra HD Smart TV',
-        sku: 'SKU-TV-001',
-        price: '₹45,999',
-        currency: '₹',
-        shortDesc: 'Experience breathtaking clarity with our top-of-the-line 4K Smart TV.',
-        longDesc: 'Our 4K Ultra HD Smart TV delivers stunning visuals with vibrant colors and incredible detail. With built-in Wi-Fi and popular streaming apps, you can access your favorite content effortlessly. Its sleek, modern design seamlessly blends into any living space, offering an immersive viewing experience for movies, games, and more.',
-        images: [
-            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Inter, sans-serif" font-size="28" fill="%239ca3af">Smart TV Placeholder</text></svg>',
-            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23d1d5db"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Inter, sans-serif" font-size="28" fill="%236b7280">TV Side View</text></svg>'
-        ],
-        altTexts: ['A sleek 4K Ultra HD Smart TV with a thin bezel.', 'A side view of the smart TV showing its slim profile.'],
-        youtubeLink: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-        inventory: 10
-    },
-    {
-        id: 'product-2',
-        name: 'Double-Door Refrigerator',
-        sku: 'SKU-REF-002',
-        price: '₹32,500',
-        currency: '₹',
-        shortDesc: 'Keep your food fresh longer with our energy-efficient double-door refrigerator.',
-        longDesc: 'This spacious double-door refrigerator features advanced cooling technology to maintain optimal temperatures and humidity, keeping your fruits and vegetables fresh for longer. Its smart inverter compressor ensures silent operation and energy efficiency. With multiple shelves and a large freezer, it offers ample storage for all your family\'s needs.',
-        images: [
-            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Inter, sans-serif" font-size="28" fill="%239ca3af">Refrigerator Placeholder</text></svg>',
-            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23d1d5db"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Inter, sans-serif" font-size="28" fill="%236b7280">Refrigerator Open</text></svg>'
-        ],
-        altTexts: ['A modern silver double-door refrigerator.', 'The inside of the refrigerator with food and drinks.'],
-        youtubeLink: 'https://www.youtube.com/embed/5qap5aO4i9A',
-        inventory: 5
-    },
-    {
-        id: 'product-3',
-        name: 'Automatic Washing Machine',
-        sku: 'SKU-WM-003',
-        price: '₹18,200',
-        currency: '₹',
-        shortDesc: 'Fully automatic washing machine with multiple wash programs for all fabric types.',
-        longDesc: 'Our fully automatic washing machine simplifies your laundry routine with its user-friendly interface and a wide range of wash programs. The powerful motor ensures deep cleaning, while the gentle drum action protects your clothes from damage. Its compact design is perfect for small apartments and its low-noise operation makes it a great choice for any home.',
-        images: [
-            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Inter, sans-serif" font-size="28" fill="%239ca3af">Washing Machine Placeholder</text></svg>',
-            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23d1d5db"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Inter, sans-serif" font-size="28" fill="%236b7280">Washing Machine Controls</text></svg>'
-        ],
-        altTexts: ['A white fully automatic washing machine.', 'The control panel of the washing machine.'],
-        youtubeLink: 'https://www.youtube.com/embed/S_I59Wq3U4M',
-        inventory: 12
-    },
-    {
-        id: 'product-4',
-        name: 'Microwave Oven with Grill',
-        sku: 'SKU-MW-004',
-        price: '₹8,990',
-        currency: '₹',
-        shortDesc: 'Cook and grill with ease using this versatile microwave oven.',
-        longDesc: 'This all-in-one microwave oven comes with a powerful grill function, allowing you to not only heat and cook your food but also grill and roast it to perfection. The easy-to-clean interior and multiple auto-cook menus make it a convenient addition to any kitchen. Its compact footprint ensures it won\'t take up too much counter space.',
-        images: [
-            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Inter, sans-serif" font-size="28" fill="%239ca3af">Microwave Placeholder</text></svg>',
-            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23d1d5db"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Inter, sans-serif" font-size="28" fill="%236b7280">Microwave Interior</text></svg>'
-        ],
-        altTexts: ['A black microwave oven with a grill function.', 'The interior of the microwave oven.'],
-        youtubeLink: 'https://www.youtube.com/embed/2_H_P7X7f3E',
-        inventory: 20
-    }
-];
-
-// Admin password for local storage
-const adminPasswordKey = 'admin_password';
-const defaultPassword = 'admin123';
-const productsKey = 'jj_home_products';
-
-const Header = ({ onPageChange, toggleAdmin, isAdminMode }) => {
-    const [isScrolled, setIsScrolled] = useState(false);
-    useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 0);
-        };
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
-
-    return (
-        <header className={`fixed top-0 left-0 w-full z-50 bg-white transition-shadow duration-250 ease-out ${isScrolled ? 'shadow-md' : 'shadow-none'}`}>
-            <div className="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center">
-                <div className="flex flex-col md:flex-row md:items-center w-full md:w-auto">
-                    <button onClick={() => onPageChange('home')} className="text-3xl font-bold font-poppins text-gray-900 cursor-pointer mb-2 md:mb-0">
-                        J. J. Sales
-                    </button>
-                    <span className="text-sm text-gray-600 ml-0 md:ml-4 font-inter text-center md:text-left">
-                        J J Home appliances
-                    </span>
-                </div>
-                <div className="flex flex-col md:flex-row md:items-center mt-2 md:mt-0 text-sm text-gray-600 font-inter">
-                    <address className="not-italic text-center md:text-right">
-                        Office at Adjacent to Subdivision R&B Vailoo, Kokernag, Anantnag, Jammu & Kashmir (192202)
-                    </address>
-                    <div className="text-center md:text-right md:ml-4 mt-2 md:mt-0">
-                        Ph. 7889890662, 6005795693
-                    </div>
-                    <button onClick={toggleAdmin} className="ml-0 md:ml-4 mt-2 md:mt-0 text-xs py-1 px-3 bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 transition-colors duration-250 ease-out">
-                        {isAdminMode ? 'Exit Admin' : 'Admin'}
-                    </button>
-                </div>
+    <!-- Header Section -->
+    <header class="bg-white shadow-sm py-6 px-4 md:px-8">
+        <div class="container mx-auto max-w-7xl flex flex-col sm:flex-row justify-between items-center text-center sm:text-left">
+            <div>
+                <h1 class="text-4xl font-bold text-gray-900">J. J. Home Appliances</h1>
+                <p class="text-sm text-gray-600 mt-2">Office: Adjacent to Subdivision R&B Vailoo, Kokernag, Anantnag, Jammu & Kashmir (192202) | Ph: 7889890662, 6005795693</p>
             </div>
-        </header>
-    );
-};
-
-const Footer = () => (
-    <footer className="bg-gray-900 text-gray-200 py-8 px-4 font-inter text-sm">
-        <div className="container mx-auto flex flex-col md:flex-row justify-between items-start md:items-center">
-            <div className="flex-1 mb-4 md:mb-0">
-                <h3 className="text-xl font-bold text-white mb-2 font-poppins">J J Home appliances</h3>
-                <address className="not-italic">
-                    Office at Adjacent to Subdivision R&B Vailoo, Kokernag, Anantnag, Jammu & Kashmir (192202)
-                </address>
-                <div className="mt-2">
-                    Ph. 7889890662, 6005795693
-                </div>
-            </div>
-            <div className="flex-1 text-center mb-4 md:mb-0">
-                {/* Social icons could go here */}
-            </div>
-            <div className="flex-1 text-left md:text-right">
-                <p>&copy; 2024 J J Home appliances. All rights reserved.</p>
+            <div class="mt-4 sm:mt-0">
+                <span class="text-xl font-semibold text-gray-500 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">J. J. Sales</span>
             </div>
         </div>
-    </footer>
-);
+    </header>
 
-const WhatsAppModal = ({ show, onClose, message, phoneNumber }) => {
-    if (!show) return null;
-
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(message)
-            .then(() => alert('Message copied to clipboard!'))
-            .catch(err => console.error('Failed to copy text: ', err));
-    };
-
-    return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-70 z-[100] flex items-center justify-center p-4">
-            <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
-                <h3 className="text-lg font-bold font-poppins mb-4 text-gray-900">Open WhatsApp Manually</h3>
-                <p className="text-sm text-gray-600 font-inter mb-4">
-                    It looks like WhatsApp can't be opened automatically. Please copy the message below and send it to the following number:
-                </p>
-                <div className="bg-gray-200 rounded-lg p-3 mb-4">
-                    <p className="font-mono text-xs text-gray-800 break-all">{message}</p>
-                </div>
-                <div className="flex flex-col items-center">
-                    <a href={`tel:${phoneNumber}`} className="text-lg text-blue-600 font-bold mb-2">
-                        {phoneNumber}
-                    </a>
-                    <button onClick={copyToClipboard} className="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition-colors duration-250 ease-out hover:bg-blue-700">
-                        Copy Message
-                    </button>
-                    <button onClick={onClose} className="mt-2 w-full text-blue-600 font-bold py-2 px-4 rounded-full transition-colors duration-250 ease-out hover:bg-blue-100">
-                        Close
-                    </button>
-                </div>
-            </div>
+    <!-- Product Catalog Section -->
+    <main class="container mx-auto max-w-7xl px-4 md:px-8 py-12">
+        <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-8 text-center">Our Products</h2>
+        <div id="product-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Product cards will be dynamically inserted here by JavaScript -->
         </div>
-    );
-};
+    </main>
 
-const HomePage = ({ products, onPageChange, setSelectedProduct }) => {
-    const containerRef = useRef(null);
-
-    useEffect(() => {
-        if (prefersReducedMotion) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const index = Array.from(containerRef.current.children).indexOf(entry.target);
-                        entry.target.style.transitionDelay = `${index * 100}ms`;
-                        entry.target.classList.add('animate-slide-up', 'animate-fade-in');
-                        observer.unobserve(entry.target);
-                    }
-                });
-            },
-            { threshold: 0.1 }
-        );
-
-        const cards = containerRef.current.children;
-        Array.from(cards).forEach(card => {
-            card.classList.add('opacity-0', 'transform', 'translate-y-4');
-            observer.observe(card);
-        });
-
-        return () => {
-            if (containerRef.current) {
-                Array.from(containerRef.current.children).forEach(card => observer.unobserve(card));
-            }
-        };
-    }, [products]);
-
-    const handleViewDetails = (product) => {
-        setSelectedProduct(product);
-        onPageChange('pdp');
-        window.scrollTo(0, 0);
-    };
-
-    return (
-        <main className="container mx-auto px-4 py-24 font-inter">
-            <section className="grid grid-cols-1 md:grid-cols-2 gap-8" ref={containerRef}>
-                {products.slice(0, 4).map(product => (
-                    <article
-                        key={product.id}
-                        className="p-4 bg-white rounded-xl shadow-lg transition-all duration-350 ease-out
-                                    hover:shadow-2xl hover:-translate-y-1 hover:transform
-                                    relative overflow-hidden group"
-                        style={{
-                            boxShadow: '0 6px 18px rgba(15,23,36,0.06)'
-                        }}
-                    >
-                        <div className="relative overflow-hidden rounded-md mb-4">
-                            <img
-                                src={product.images[0]}
-                                alt={product.altTexts[0]}
-                                className="w-full h-48 object-cover rounded-md transition-transform duration-350 ease-out group-hover:scale-110"
-                            />
-                        </div>
-                        <h2 className="text-xl font-bold text-gray-900 font-poppins line-clamp-1">
-                            {product.name}
-                        </h2>
-                        <p className="text-gray-600 text-sm mt-1 mb-2 font-inter line-clamp-1">
-                            {product.shortDesc}
-                        </p>
-                        <div className="flex justify-between items-center mt-4">
-                            <span className="text-2xl font-bold text-blue-600 font-poppins">{product.price}</span>
-                            <button
-                                onClick={() => handleViewDetails(product)}
-                                className="bg-orange-500 text-white font-bold py-2 px-6 rounded-full transition-colors duration-250 ease-out hover:bg-orange-600"
-                            >
-                                View Details
-                            </button>
-                        </div>
-                    </article>
-                ))}
-            </section>
-        </main>
-    );
-};
-
-const ProductDetailPage = ({ product, onPageChange, allProducts, whatsappNumber }) => {
-    const [activeImage, setActiveImage] = useState(0);
-    const [quantity, setQuantity] = useState(1);
-    const [showShipping, setShowShipping] = useState(false);
-    const [showReturns, setShowReturns] = useState(false);
-    const [isPlayerReady, setIsPlayerReady] = useState(false);
-    const [showPlayOverlay, setShowPlayOverlay] = useState(true);
-    const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
-    const playerRef = useRef(null);
-    const videoRef = useRef(null);
-
-    // Filter out the current product for related products
-    const relatedProducts = allProducts.filter(p => p.id !== product.id).slice(0, 3);
-
-    useEffect(() => {
-        // IntersectionObserver for video autoplay
-        if (videoRef.current) {
-            let userInteracted = false;
-            const handleUserInteraction = () => {
-                userInteracted = true;
-                document.removeEventListener('click', handleUserInteraction);
-                document.removeEventListener('keydown', handleUserInteraction);
-            };
-            document.addEventListener('click', handleUserInteraction);
-            document.addEventListener('keydown', handleUserInteraction);
-
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (isPlayerReady && playerRef.current) {
-                        if (entry.isIntersecting) {
-                            if (userInteracted && !prefersReducedMotion) {
-                                playerRef.current.playVideo();
-                            }
-                        } else {
-                            playerRef.current.pauseVideo();
-                        }
-                    }
-                });
-            }, { threshold: 0.5 });
-            observer.observe(videoRef.current);
-
-            return () => {
-                observer.disconnect();
-                document.removeEventListener('click', handleUserInteraction);
-                document.removeEventListener('keydown', handleUserInteraction);
-            };
-        }
-    }, [isPlayerReady, prefersReducedMotion]);
-
-    useEffect(() => {
-        // Load YouTube Player API script
-        if (!window.YT) {
-            const tag = document.createElement('script');
-            tag.src = "https://www.youtube.com/iframe_api";
-            const firstScriptTag = document.getElementsByTagName('script')[0];
-            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-
-            window.onYouTubeIframeAPIReady = () => {
-                const player = new window.YT.Player(playerRef.current, {
-                    videoId: new URLSearchParams(new URL(product.youtubeLink).search).get('v') || '',
-                    playerVars: {
-                        'autoplay': 0,
-                        'controls': 1,
-                        'modestbranding': 1
-                    },
-                    events: {
-                        'onReady': () => setIsPlayerReady(true),
-                        'onStateChange': (event) => {
-                            if (event.data === window.YT.PlayerState.PLAYING) {
-                                setShowPlayOverlay(false);
-                            }
-                        }
-                    }
-                });
-            };
-        } else {
-            const player = new window.YT.Player(playerRef.current, {
-                videoId: new URLSearchParams(new URL(product.youtubeLink).search).get('v') || '',
-                playerVars: {
-                    'autoplay': 0,
-                    'controls': 1,
-                    'modestbranding': 1
-                },
-                events: {
-                    'onReady': () => setIsPlayerReady(true),
-                    'onStateChange': (event) => {
-                        if (event.data === window.YT.PlayerState.PLAYING) {
-                            setShowPlayOverlay(false);
-                        }
-                    }
-                }
-            });
-        }
-    }, [product]);
-
-    const handleBuyNow = (e) => {
-        const message = `I want to buy ${product.name}.`;
-        const encodedMessage = encodeURIComponent(message);
-        const waLink = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
-        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-        const isMobile = /android|iphone|ipad|ipod|blackberry|windows phone/i.test(userAgent);
-
-        if (isMobile) {
-            window.location.href = waLink;
-        } else {
-            // Check if WhatsApp Web is open
-            const isWhatsAppWebOpen = () => {
-                try {
-                    const waWindow = window.open(waLink, '_blank');
-                    if (!waWindow || waWindow.closed || typeof waWindow.closed === 'undefined') {
-                        return false;
-                    }
-                    return true;
-                } catch (e) {
-                    return false;
-                }
-            };
-
-            if (isWhatsAppWebOpen()) {
-                 // The window is open, so just let it handle the redirect.
-            } else {
-                // Graceful degradation for desktop
-                setShowWhatsAppModal(true);
-            }
-        }
-    };
-
-    const playVideo = () => {
-        if (playerRef.current && isPlayerReady) {
-            playerRef.current.playVideo();
-            setShowPlayOverlay(false);
-        }
-    };
-    
-    // Quantity stepper handlers
-    const decreaseQuantity = () => setQuantity(prev => Math.max(1, prev - 1));
-    const increaseQuantity = () => setQuantity(prev => prev + 1);
-    
-    const handleAddProductToCart = () => {
-        alert("This is a placeholder for 'Add to Cart'.");
-    };
-
-    const goBack = () => {
-        onPageChange('home');
-    };
-
-    return (
-        <main className="container mx-auto px-4 py-24 font-inter">
-            <button onClick={goBack} className="text-blue-600 mb-6 flex items-center transition-colors duration-250 ease-out hover:text-blue-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Back to products
-            </button>
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-                {/* Product Gallery */}
-                <div className="lg:col-span-1">
-                    <div className="relative aspect-video rounded-xl overflow-hidden mb-4">
-                        <img
-                            src={product.images[activeImage]}
-                            alt={product.altTexts[activeImage]}
-                            className="w-full h-full object-cover transition-opacity duration-250 ease-out"
-                        />
-                    </div>
-                    <div className="flex space-x-2 overflow-x-auto">
-                        {product.images.map((img, index) => (
-                            <button
-                                key={index}
-                                onClick={() => setActiveImage(index)}
-                                className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-all duration-250 ease-out ${index === activeImage ? 'border-blue-600' : 'border-transparent'}`}
-                            >
-                                <img src={img} alt={product.altTexts[index]} className="w-full h-full object-cover" />
-                            </button>
-                        ))}
-                    </div>
-                    {product.youtubeLink && (
-                        <div ref={videoRef} className="relative mt-8 rounded-xl overflow-hidden shadow-xl" style={{ paddingTop: '56.25%' }}>
-                            <div className="absolute top-0 left-0 w-full h-full">
-                                <iframe
-                                    ref={playerRef}
-                                    id="youtube-player"
-                                    width="100%"
-                                    height="100%"
-                                    src={product.youtubeLink}
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowFullScreen
-                                    title="Product Video"
-                                ></iframe>
-                            </div>
-                            {showPlayOverlay && (
-                                <button
-                                    onClick={playVideo}
-                                    className="absolute inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center cursor-pointer transition-opacity duration-250 ease-out hover:opacity-80"
-                                >
-                                    <svg className="w-20 h-20 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
-                                    </svg>
-                                </button>
-                            )}
-                        </div>
-                    )}
-                </div>
-                {/* Product Details */}
-                <div className="lg:col-span-1">
-                    <h1 className="text-3xl font-bold font-poppins text-gray-900 mb-2">{product.name}</h1>
-                    <p className="text-4xl font-extrabold text-blue-600 font-poppins mb-4">{product.price}</p>
-                    <p className="text-sm text-gray-600 font-inter mb-6">{product.shortDesc}</p>
-                    <div className="prose max-w-none text-gray-800 font-inter leading-relaxed mb-8">
-                        {product.longDesc}
-                    </div>
-                    <div className="flex items-center space-x-4 mb-8">
-                        <div className="flex items-center space-x-2 border rounded-full overflow-hidden">
-                            <button onClick={decreaseQuantity} className="bg-gray-200 text-gray-600 p-2 rounded-l-full transition-colors duration-250 ease-out hover:bg-gray-300">-</button>
-                            <span className="font-bold text-gray-900 px-2">{quantity}</span>
-                            <button onClick={increaseQuantity} className="bg-gray-200 text-gray-600 p-2 rounded-r-full transition-colors duration-250 ease-out hover:bg-gray-300">+</button>
-                        </div>
-                        <button
-                            onClick={handleBuyNow}
-                            className="flex-1 bg-orange-500 text-white font-bold py-3 px-6 rounded-full transition-colors duration-250 ease-out hover:bg-orange-600"
-                        >
-                            Buy Now
-                        </button>
-                        <button
-                            onClick={handleAddProductToCart}
-                            className="flex-1 border-2 border-orange-500 text-orange-500 font-bold py-3 px-6 rounded-full transition-colors duration-250 ease-out hover:bg-orange-500 hover:text-white"
-                        >
-                            Add to Cart
-                        </button>
-                    </div>
-                    {/* Trust Badges */}
-                    <div className="flex justify-around items-center space-x-4 bg-gray-200 p-4 rounded-xl mb-8">
-                        <span className="text-sm text-gray-600 text-center">✅ Quality Assured</span>
-                        <span className="text-sm text-gray-600 text-center">🚚 Fast Shipping</span>
-                        <span className="text-sm text-gray-600 text-center">🔒 Secure Payment</span>
-                    </div>
-                    {/* Accordion */}
-                    <div className="space-y-4 mb-8">
-                        <div className="border border-gray-200 rounded-xl">
-                            <button
-                                onClick={() => setShowShipping(!showShipping)}
-                                className="w-full text-left p-4 flex justify-between items-center text-gray-900 font-bold"
-                            >
-                                Shipping Information
-                                <svg className={`w-4 h-4 transform transition-transform duration-250 ease-out ${showShipping ? 'rotate-180' : 'rotate-0'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
-                            </button>
-                            {showShipping && (
-                                <div className="p-4 border-t border-gray-200 text-gray-600">
-                                    <p>Your order will be shipped within 2-3 business days. Delivery times may vary depending on your location.</p>
-                                </div>
-                            )}
-                        </div>
-                        <div className="border border-gray-200 rounded-xl">
-                            <button
-                                onClick={() => setShowReturns(!showReturns)}
-                                className="w-full text-left p-4 flex justify-between items-center text-gray-900 font-bold"
-                            >
-                                Returns & Exchanges
-                                <svg className={`w-4 h-4 transform transition-transform duration-250 ease-out ${showReturns ? 'rotate-180' : 'rotate-0'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
-                            </button>
-                            {showReturns && (
-                                <div className="p-4 border-t border-gray-200 text-gray-600">
-                                    <p>We offer a 15-day return policy for unused products. Please contact us for return instructions.</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </section>
-            {/* Related Products */}
-            {relatedProducts.length > 0 && (
-                <section className="mt-12">
-                    <h3 className="text-2xl font-bold font-poppins text-gray-900 mb-6">Related Products</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
-                        {relatedProducts.map(related => (
-                            <article key={related.id} className="bg-white rounded-xl shadow-lg p-4">
-                                <img src={related.images[0]} alt={related.altTexts[0]} className="w-full h-40 object-cover rounded-md mb-4" />
-                                <h4 className="text-lg font-bold font-poppins text-gray-900 line-clamp-1">{related.name}</h4>
-                                <p className="text-xl font-bold text-blue-600 font-poppins mt-1">{related.price}</p>
-                                <button
-                                    onClick={() => { onPageChange('pdp'); setSelectedProduct(related); window.scrollTo(0, 0); }}
-                                    className="w-full mt-4 bg-blue-600 text-white font-bold py-2 rounded-full transition-colors duration-250 ease-out hover:bg-blue-700"
-                                >
-                                    View Details
-                                </button>
-                            </article>
-                        ))}
-                    </div>
-                </section>
-            )}
-            {/* Sticky Mobile CTA Bar */}
-            <div className="fixed bottom-0 left-0 w-full bg-white md:hidden shadow-lg p-4 z-40">
-                <div className="flex justify-between items-center">
-                    <span className="text-2xl font-bold text-blue-600 font-poppins">{product.price}</span>
-                    <button
-                        onClick={handleBuyNow}
-                        className="bg-orange-500 text-white font-bold py-3 px-6 rounded-full transition-colors duration-250 ease-out hover:bg-orange-600"
-                    >
-                        Buy Now
-                    </button>
-                </div>
-            </div>
-            <WhatsAppModal
-                show={showWhatsAppModal}
-                onClose={() => setShowWhatsAppModal(false)}
-                message={`I want to buy ${product.name}.`}
-                phoneNumber={whatsappNumber}
-            />
-        </main>
-    );
-};
-
-const AdminPage = ({ products, setProducts, onPageChange, isAdminMode }) => {
-    const [editingProduct, setEditingProduct] = useState(null);
-    const [currentProductForm, setCurrentProductForm] = useState(null);
-    const fileInputRef = useRef(null);
-
-    useEffect(() => {
-        if (editingProduct) {
-            setCurrentProductForm({ ...editingProduct, images: editingProduct.images || [], altTexts: editingProduct.altTexts || [] });
-        } else {
-            setCurrentProductForm({
-                id: null, name: '', sku: '', price: '', currency: '₹', shortDesc: '', longDesc: '',
-                images: [], altTexts: [], youtubeLink: '', inventory: 0
-            });
-        }
-    }, [editingProduct]);
-
-    if (!isAdminMode) {
-        return (
-            <div className="container mx-auto px-4 py-24 text-center">
-                <h1 className="text-2xl font-bold text-gray-900 font-poppins">Access Denied</h1>
-                <p className="mt-4 text-gray-600 font-inter">Please use the "Admin" button in the header to enter the password.</p>
-            </div>
-        );
-    }
-
-    const validateYouTubeUrl = (url) => {
-        const pattern = /^(https?\:\/\/)?(www\.youtube\.com|youtu\.?be)\/.+$/;
-        return url === '' || pattern.test(url);
-    };
-
-    const handleFileChange = (e) => {
-        const files = Array.from(e.target.files);
-        const newImages = [...currentProductForm.images];
-        const newAltTexts = [...currentProductForm.altTexts];
-
-        files.forEach(file => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                if (newImages.length < 6) {
-                    newImages.push(reader.result);
-                    newAltTexts.push(`Image for ${currentProductForm.name}`);
-                    setCurrentProductForm({ ...currentProductForm, images: newImages, altTexts: newAltTexts });
-                } else {
-                    alert('You can only upload up to 6 images.');
-                }
-            };
-            reader.readAsDataURL(file);
-        });
-    };
-
-    const handleRemoveImage = (index) => {
-        const newImages = [...currentProductForm.images];
-        const newAltTexts = [...currentProductForm.altTexts];
-        newImages.splice(index, 1);
-        newAltTexts.splice(index, 1);
-        setCurrentProductForm({ ...currentProductForm, images: newImages, altTexts: newAltTexts });
-    };
-
-    const handleSave = () => {
-        if (!validateYouTubeUrl(currentProductForm.youtubeLink)) {
-            alert('Please enter a valid YouTube URL.');
-            return;
-        }
-
-        let updatedProducts;
-        if (currentProductForm.id) {
-            updatedProducts = products.map(p =>
-                p.id === currentProductForm.id ? { ...currentProductForm, images: currentProductForm.images.slice(0, 6) } : p
-            );
-        } else {
-            const newProduct = {
-                ...currentProductForm,
-                id: `product-${Date.now()}`,
-                images: currentProductForm.images.slice(0, 6)
-            };
-            updatedProducts = [...products, newProduct];
-        }
-        setProducts(updatedProducts);
-        setEditingProduct(null);
-    };
-
-    const handleDelete = (id) => {
-        const updatedProducts = products.filter(p => p.id !== id);
-        setProducts(updatedProducts);
-    };
-
-    const handleReorder = (direction, index) => {
-        const updatedProducts = [...products];
-        if (direction === 'up' && index > 0) {
-            [updatedProducts[index], updatedProducts[index - 1]] = [updatedProducts[index - 1], updatedProducts[index]];
-        } else if (direction === 'down' && index < updatedProducts.length - 1) {
-            [updatedProducts[index], updatedProducts[index + 1]] = [updatedProducts[index + 1], updatedProducts[index]];
-        }
-        setProducts(updatedProducts);
-    };
-
-    const handleExport = () => {
-        const dataStr = JSON.stringify(products, null, 2);
-        const blob = new Blob([dataStr], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'jj_home_products_backup.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    };
-
-    const handleImport = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                try {
-                    const importedProducts = JSON.parse(event.target.result);
-                    if (Array.isArray(importedProducts)) {
-                        setProducts(importedProducts);
-                        alert('Product data imported successfully!');
-                    } else {
-                        throw new Error('Invalid JSON format.');
-                    }
-                } catch (error) {
-                    alert('Failed to import data: ' + error.message);
-                }
-            };
-            reader.readAsText(file);
-        }
-    };
-
-    return (
-        <main className="container mx-auto px-4 py-24 font-inter">
-            <h1 className="text-2xl font-bold font-poppins text-gray-900 mb-8">Admin Dashboard</h1>
-
-            {/* Product List */}
-            <section className="bg-white p-6 rounded-xl shadow-lg mb-8">
-                <h2 className="text-xl font-bold font-poppins text-gray-900 mb-4">Manage Products</h2>
-                <div className="space-y-4">
-                    {products.map((product, index) => (
-                        <div key={product.id} className="flex flex-col sm:flex-row items-center justify-between p-4 border border-gray-200 rounded-lg bg-gray-50">
-                            <span className="font-bold text-gray-900 mb-2 sm:mb-0 line-clamp-1">{product.name}</span>
-                            <div className="flex space-x-2">
-                                <button onClick={() => handleReorder('up', index)} className="text-gray-600 hover:text-gray-900 disabled:opacity-50" disabled={index === 0}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                                </button>
-                                <button onClick={() => handleReorder('down', index)} className="text-gray-600 hover:text-gray-900 disabled:opacity-50" disabled={index === products.length - 1}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                                </button>
-                                <button onClick={() => setEditingProduct(product)} className="text-blue-600 hover:text-blue-800">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                </button>
-                                <button onClick={() => handleDelete(product.id)} className="text-red-600 hover:text-red-800">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                <button
-                    onClick={() => setEditingProduct(null)}
-                    className="mt-6 w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-full transition-colors duration-250 ease-out hover:bg-blue-700"
-                >
-                    Add New Product
+    <!-- Product Detail Modal -->
+    <div id="product-modal" class="fixed inset-0 hidden items-center justify-center p-4 modal-overlay transition-opacity duration-300">
+        <div id="modal-content" class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-4xl mx-auto max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-end">
+                <button id="close-modal" class="text-gray-500 hover:text-gray-800 transition-colors">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
-            </section>
+            </div>
 
-            {/* Product Edit Form */}
-            <section className="bg-white p-6 rounded-xl shadow-lg mb-8">
-                <h2 className="text-xl font-bold font-poppins text-gray-900 mb-4">
-                    {editingProduct ? 'Edit Product' : 'Add New Product'}
-                </h2>
-                <form className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Product Name</label>
-                        <input
-                            type="text"
-                            value={currentProductForm?.name}
-                            onChange={(e) => setCurrentProductForm({ ...currentProductForm, name: e.target.value })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                        />
-                    </div>
-                    {/* Other fields */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">SKU</label>
-                        <input
-                            type="text"
-                            value={currentProductForm?.sku}
-                            onChange={(e) => setCurrentProductForm({ ...currentProductForm, sku: e.target.value })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Price</label>
-                        <input
-                            type="text"
-                            value={currentProductForm?.price}
-                            onChange={(e) => setCurrentProductForm({ ...currentProductForm, price: e.target.value })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Currency</label>
-                        <input
-                            type="text"
-                            value={currentProductForm?.currency}
-                            onChange={(e) => setCurrentProductForm({ ...currentProductForm, currency: e.target.value })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Short Description</label>
-                        <textarea
-                            value={currentProductForm?.shortDesc}
-                            onChange={(e) => setCurrentProductForm({ ...currentProductForm, shortDesc: e.target.value })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Long Description</label>
-                        <textarea
-                            value={currentProductForm?.longDesc}
-                            onChange={(e) => setCurrentProductForm({ ...currentProductForm, longDesc: e.target.value })}
-                            rows="4"
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">YouTube Link</label>
-                        <input
-                            type="url"
-                            value={currentProductForm?.youtubeLink}
-                            onChange={(e) => setCurrentProductForm({ ...currentProductForm, youtubeLink: e.target.value })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                        />
-                        {!validateYouTubeUrl(currentProductForm?.youtubeLink) && (
-                            <p className="mt-1 text-xs text-red-500">Please enter a valid YouTube URL.</p>
-                        )}
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Inventory/Qty</label>
-                        <input
-                            type="number"
-                            value={currentProductForm?.inventory}
-                            onChange={(e) => setCurrentProductForm({ ...currentProductForm, inventory: parseInt(e.target.value) })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Images (Max 6)</label>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            multiple
-                            accept="image/*"
-                            onChange={handleFileChange}
-                            className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                        />
-                        <div className="flex flex-wrap mt-4 space-x-2">
-                            {currentProductForm?.images?.map((img, index) => (
-                                <div key={index} className="relative w-20 h-20">
-                                    <img src={img} alt={currentProductForm.altTexts[index]} className="w-full h-full object-cover rounded-md" />
-                                    <button onClick={() => handleRemoveImage(index)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs">x</button>
-                                </div>
-                            ))}
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-4">
+                <!-- Product images and details will be inserted here -->
+                <div class="lg:col-span-1">
+                    <div id="product-images" class="relative">
+                        <!-- Image Gallery -->
+                        <div id="image-gallery" class="w-full">
+                            <img id="main-image" src="" alt="Product Image" class="w-full h-auto rounded-lg mb-4">
+                        </div>
+                        <div id="thumbnail-gallery" class="flex overflow-x-auto gap-2">
+                             <!-- Thumbnails will be populated here -->
                         </div>
                     </div>
+                </div>
+
+                <div class="lg:col-span-1 flex flex-col justify-between">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Image Alt Text (Edit below)</label>
-                        {currentProductForm?.altTexts?.map((alt, index) => (
-                             <input
-                                key={index}
-                                type="text"
-                                value={alt}
-                                onChange={(e) => {
-                                    const newAltTexts = [...currentProductForm.altTexts];
-                                    newAltTexts[index] = e.target.value;
-                                    setCurrentProductForm({ ...currentProductForm, altTexts: newAltTexts });
-                                }}
-                                placeholder={`Alt text for image ${index + 1}`}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                            />
-                        ))}
+                        <h3 id="modal-product-name" class="text-3xl font-bold text-gray-900 mb-2"></h3>
+                        <p id="modal-price" class="text-4xl font-extrabold text-blue-600 mb-4"></p>
+                        
+                        <div id="modal-youtube" class="yt-container mb-6">
+                            <!-- YouTube video will be embedded here -->
+                        </div>
                     </div>
-                </form>
-                <div className="flex justify-between mt-6">
-                    <button
-                        onClick={handleSave}
-                        className="bg-blue-600 text-white font-bold py-2 px-6 rounded-full transition-colors duration-250 ease-out hover:bg-blue-700"
-                    >
-                        {editingProduct ? 'Update Product' : 'Add Product'}
-                    </button>
-                    {editingProduct && (
-                        <button
-                            onClick={() => setEditingProduct(null)}
-                            className="bg-gray-400 text-white font-bold py-2 px-6 rounded-full transition-colors duration-250 ease-out hover:bg-gray-500"
-                        >
-                            Cancel
+
+                    <a id="whatsapp-link" href="#" target="_blank" class="w-full">
+                        <button class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-lg">
+                            <svg class="w-6 h-6 inline-block mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12.001 2c-5.523 0-10.001 4.478-10.001 10.001 0 1.776.467 3.447 1.303 4.912l-1.396 5.093 5.213-1.366c1.428.784 3.064 1.218 4.792 1.218 5.522 0 10.001-4.478 10.001-10.001s-4.478-10.001-10.001-10.001zm3.877 14.17c-.201.272-.619.418-1.229.418-.619 0-1.294-.146-1.895-.291-1.224-.316-2.525-1.074-3.513-2.073-.997-.988-1.761-2.288-2.077-3.511-.145-.601-.291-1.275-.291-1.894 0-.61.146-1.028.418-1.229.272-.201.619-.317 1.056-.153.435.164.717.818.84 1.143l.033.093c.123.315.17.653.146.994l-.048.243c-.097.489-.253.953-.418 1.349-.164.396-.341.696-.445.892-.104.194.208.528.513.834.306.307.63.626.834.522.194-.105.494-.282.89-.446.396-.164.86-.321 1.349-.418l.243-.048c.341-.024.679.023.994.146l.093.033c.325.123.979.405 1.143.84.164.436-.153.784-.153 1.056zm-3.136-1.55c.201.201.522.317.923.317s.722-.116.923-.317c.201-.201.317-.522.317-.923s-.116-.722-.317-.923c-.201-.201-.522-.317-.923-.317s-.722.116-.923.317c-.201.201-.317.522-.317.923s.116.722.317.923z"></path></svg>
+                            Buy on WhatsApp
                         </button>
-                    )}
+                    </a>
                 </div>
-            </section>
-
-            {/* Export/Import */}
-            <section className="bg-white p-6 rounded-xl shadow-lg">
-                <h2 className="text-xl font-bold font-poppins text-gray-900 mb-4">Data Management</h2>
-                <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-                    <button onClick={handleExport} className="w-full bg-gray-600 text-white font-bold py-2 px-6 rounded-full transition-colors duration-250 ease-out hover:bg-gray-700">
-                        Export Data
-                    </button>
-                    <label className="w-full">
-                        <input type="file" onChange={handleImport} className="hidden" accept=".json" />
-                        <span className="cursor-pointer w-full bg-blue-600 text-white font-bold py-2 px-6 rounded-full inline-block text-center transition-colors duration-250 ease-out hover:bg-blue-700">
-                            Import Data
-                        </span>
-                    </label>
-                </div>
-            </section>
-        </main>
-    );
-};
-
-const App = () => {
-    const [currentPage, setCurrentPage] = useState('home');
-    const [products, setProducts] = useState(defaultProducts);
-    const [selectedProduct, setSelectedProduct] = useState(null);
-    const [isAdminMode, setIsAdminMode] = useState(false);
-    const whatsappNumber = '916005795693';
-
-    useEffect(() => {
-        // Load products from localStorage on initial render
-        const storedProducts = localStorage.getItem(productsKey);
-        if (storedProducts) {
-            try {
-                const parsedProducts = JSON.parse(storedProducts);
-                setProducts(parsedProducts);
-            } catch (e) {
-                console.error("Failed to parse products from localStorage, using defaults.");
-                setProducts(defaultProducts);
-            }
-        }
-    }, []);
-
-    useEffect(() => {
-        if (isAdminMode) return;
-        // Save products to localStorage whenever they change
-        localStorage.setItem(productsKey, JSON.stringify(products));
-    }, [products, isAdminMode]);
-
-    const toggleAdminMode = () => {
-        if (isAdminMode) {
-            setIsAdminMode(false);
-            setCurrentPage('home');
-        } else {
-            const storedPassword = localStorage.getItem(adminPasswordKey) || defaultPassword;
-            const password = prompt("Enter Admin Password:");
-            if (password === storedPassword) {
-                setIsAdminMode(true);
-                setCurrentPage('admin');
-                alert('Admin mode activated.');
-            } else {
-                alert('Incorrect password.');
-            }
-        }
-    };
-
-    return (
-        <div className="bg-gray-100 min-h-screen">
-            <style>
-                {`
-                    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700&family=Inter:wght@400;700&display=swap');
-                    
-                    html { scroll-behavior: smooth; }
-                    body { font-family: 'Inter', sans-serif; }
-                    h1, h2, h3, h4, h5, h6 { font-family: 'Poppins', sans-serif; }
-                    
-                    .transition-all { transition-property: all; }
-                    .duration-250 { transition-duration: 250ms; }
-                    .duration-350 { transition-duration: 350ms; }
-                    .ease-out { transition-timing-function: cubic-bezier(0, 0, 0.2, 1); }
-
-                    @media (prefers-reduced-motion) {
-                        .transition-all, .transition-colors, .transition-transform {
-                            transition: none !important;
-                        }
-                    }
-
-                    @keyframes slideUp {
-                        from { opacity: 0; transform: translateY(16px); }
-                        to { opacity: 1; transform: translateY(0); }
-                    }
-
-                    .animate-slide-up {
-                        animation: slideUp 0.35s ease-out forwards;
-                    }
-                    .animate-fade-in {
-                        animation: fadeIn 0.35s ease-out forwards;
-                    }
-                `}
-            </style>
-            <Header onPageChange={setCurrentPage} toggleAdmin={toggleAdminMode} isAdminMode={isAdminMode} />
-            <main>
-                {isAdminMode ? (
-                    <AdminPage products={products} setProducts={setProducts} onPageChange={setCurrentPage} isAdminMode={isAdminMode} />
-                ) : currentPage === 'home' ? (
-                    <HomePage products={products} onPageChange={setCurrentPage} setSelectedProduct={setSelectedProduct} />
-                ) : (
-                    <ProductDetailPage product={selectedProduct} onPageChange={setCurrentPage} allProducts={products} whatsappNumber={whatsappNumber} />
-                )}
-            </main>
-            <Footer />
+            </div>
         </div>
-    );
-};
+    </div>
 
-root.render(<App />);
+    <script>
+        // Data for all products
+        // You can easily add, remove, or edit products here.
+        // The images array can hold multiple URLs.
+        const products = [
+            {
+                name: "Prestige Induction Cooktop",
+                price: "₹3,999",
+                images: [
+                    "https://placehold.co/800x600/F0F0F0/2c3e50?text=Prestige+Induction",
+                    "https://placehold.co/800x600/C0C0C0/2c3e50?text=Side+View",
+                    "https://placehold.co/800x600/D0D0D0/2c3e50?text=Controls"
+                ],
+                youtube: "jD_FjXgW71k" // Example YouTube video ID
+            },
+            {
+                name: "Bajaj Mixer Grinder",
+                price: "₹2,500",
+                images: [
+                    "https://placehold.co/800x600/D9D9D9/2c3e50?text=Bajaj+Mixer",
+                    "https://placehold.co/800x600/B0B0B0/2c3e50?text=Jar+Set",
+                ],
+                youtube: "j8z8_E5T72k"
+            },
+            {
+                name: "Philips Electric Iron",
+                price: "₹1,200",
+                images: [
+                    "https://placehold.co/800x600/A0A0A0/2c3e50?text=Philips+Iron",
+                    "https://placehold.co/800x600/E0E0E0/2c3e50?text=Soleplate"
+                ],
+                youtube: "G1L0m7vX11A"
+            },
+            {
+                name: "Havells Water Heater",
+                price: "₹7,800",
+                images: [
+                    "https://placehold.co/800x600/B0B0B0/2c3e50?text=Havells+Water+Heater",
+                    "https://placehold.co/800x600/A5A5A5/2c3e50?text=Installation+View"
+                ],
+                youtube: "p8oD_k7y0A4"
+            }
+        ];
+
+        // Get DOM elements
+        const productList = document.getElementById('product-list');
+        const modal = document.getElementById('product-modal');
+        const closeModalButton = document.getElementById('close-modal');
+        const modalProductName = document.getElementById('modal-product-name');
+        const modalPrice = document.getElementById('modal-price');
+        const mainImage = document.getElementById('main-image');
+        const thumbnailGallery = document.getElementById('thumbnail-gallery');
+        const whatsappLink = document.getElementById('whatsapp-link');
+        const modalYoutube = document.getElementById('modal-youtube');
+
+        // Function to render product cards
+        function renderProducts() {
+            productList.innerHTML = '';
+            products.forEach((product, index) => {
+                const card = document.createElement('div');
+                card.className = "product-card bg-white rounded-lg overflow-hidden shadow-lg cursor-pointer flex flex-col items-center p-4 text-center";
+                card.setAttribute('data-index', index);
+
+                card.innerHTML = `
+                    <img src="${product.images[0]}" alt="${product.name}" class="w-full h-48 object-cover rounded-md mb-4">
+                    <div class="flex-grow">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-1">${product.name}</h3>
+                        <p class="text-2xl font-bold text-blue-600 mb-4">${product.price}</p>
+                    </div>
+                    <button class="bg-gray-200 text-gray-800 font-medium py-2 px-6 rounded-lg hover:bg-gray-300 transition-colors">
+                        View Details
+                    </button>
+                `;
+                
+                card.addEventListener('click', () => showProductDetails(product));
+                productList.appendChild(card);
+            });
+        }
+
+        // Function to show the product detail modal
+        function showProductDetails(product) {
+            modalProductName.textContent = product.name;
+            modalPrice.textContent = product.price;
+
+            // Set up main image and thumbnails
+            mainImage.src = product.images[0];
+            thumbnailGallery.innerHTML = '';
+            product.images.forEach(imgUrl => {
+                const thumb = document.createElement('img');
+                thumb.src = imgUrl;
+                thumb.className = "w-20 h-20 object-cover rounded-lg cursor-pointer transition-transform transform hover:scale-105";
+                thumb.addEventListener('click', () => {
+                    mainImage.src = imgUrl;
+                });
+                thumbnailGallery.appendChild(thumb);
+            });
+
+            // Embed YouTube video
+            const youtubeEmbedUrl = product.youtube ? `https://www.youtube.com/embed/${product.youtube}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0` : '';
+            modalYoutube.innerHTML = product.youtube ? `<iframe src="${youtubeEmbedUrl}" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>` : '';
+            
+            // Set up WhatsApp link
+            const whatsappMessage = `I want to buy ${product.name}`;
+            const whatsappUrl = `https://wa.me/6005795693?text=${encodeURIComponent(whatsappMessage)}`;
+            whatsappLink.href = whatsappUrl;
+
+            // Show modal
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            modal.classList.remove('fade-out'); // Remove any lingering fade-out class
+        }
+
+        // Function to close the modal
+        function closeProductDetails() {
+            modal.classList.add('fade-out');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                
+                // Stop the YouTube video from playing
+                const iframe = modalYoutube.querySelector('iframe');
+                if (iframe) {
+                    iframe.src = iframe.src;
+                }
+            }, 300); // Wait for the fade-out animation to complete
+        }
+
+        // Event listeners
+        closeModalButton.addEventListener('click', closeProductDetails);
+        window.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                closeProductDetails();
+            }
+        });
+
+        // Initial render
+        document.addEventListener('DOMContentLoaded', renderProducts);
+    </script>
+
+</body>
+</html>
